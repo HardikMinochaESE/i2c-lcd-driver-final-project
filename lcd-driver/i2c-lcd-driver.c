@@ -82,6 +82,10 @@ static void lcd_init(struct i2c_client *client)
     // Clear display
     lcd_write_byte(client, LCD_CLEAR, LCD_CMD);
     msleep(2);
+
+        // Clear display
+    lcd_write_byte(client, LCD_CLEAR, LCD_CMD);
+    msleep(2);
     
     // Set entry mode
     lcd_write_byte(client, LCD_ENTRY_MODE | LCD_ENTRY_LEFT, LCD_CMD);
@@ -93,6 +97,19 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     
     lcd_client = client;
     lcd_init(client);
+    
+    // Display "Driver Loaded" on the LCD
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, LCD_CMD); // Move to first line
+    const char *msg1 = "Driver";
+    while (*msg1) {
+        lcd_write_byte(client, *msg1++, LCD_DATA);
+    }
+    
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x40, LCD_CMD); // Move to second line
+    const char *msg2 = "Loaded";
+    while (*msg2) {
+        lcd_write_byte(client, *msg2++, LCD_DATA);
+    }
     
     pr_info("LCD Driver: Initialization complete\n");
     return 0;
@@ -120,9 +137,25 @@ static struct i2c_driver lcd_driver = {
     .id_table = lcd_id,
 };
 
-module_i2c_driver(lcd_driver);
+static int __init lcd_driver_init(void)
+{
+    int ret;
+    ret = i2c_register_driver(THIS_MODULE, &lcd_driver);
+    if (ret == 0) {
+        pr_info("LCD Driver: Ho gaya load bkl...\n");
+    }
+    return ret;
+}
+
+static void __exit lcd_driver_exit(void)
+{
+    i2c_del_driver(&lcd_driver);
+}
+
+module_init(lcd_driver_init);
+module_exit(lcd_driver_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Your Name");
+MODULE_AUTHOR("HARDIK MINOCHA");
 MODULE_DESCRIPTION("I2C LCD 16x2 Display Driver");
 MODULE_VERSION("1.0"); 
