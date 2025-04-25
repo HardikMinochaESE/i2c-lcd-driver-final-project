@@ -13,8 +13,13 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
 STRIP = $(CROSS_COMPILE)strip
 
+# ARM-specific flags
+ARCH = arm
+CFLAGS_MODULE = -fno-pic
+
 all:
 	$(MAKE) -C $(KERNEL_SRC) M=$(PWD) \
+		ARCH=$(ARCH) \
 		CC="$(CC)" \
 		LD="$(LD)" \
 		AR="$(AR)" \
@@ -22,6 +27,7 @@ all:
 		OBJDUMP="$(OBJDUMP)" \
 		STRIP="$(STRIP)" \
 		CROSS_COMPILE="$(CROSS_COMPILE)" \
+		CFLAGS_MODULE="$(CFLAGS_MODULE)" \
 		modules
 
 clean:
