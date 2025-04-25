@@ -87,7 +87,7 @@ static void lcd_init(struct i2c_client *client)
     lcd_write_byte(client, LCD_ENTRY_MODE | LCD_ENTRY_LEFT, LCD_CMD);
 }
 
-static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int lcd_probe(struct i2c_client *client)
 {
     pr_info("LCD Driver: Probing device\n");
     
@@ -98,10 +98,9 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     return 0;
 }
 
-static int lcd_remove(struct i2c_client *client)
+static void lcd_remove(struct i2c_client *client)
 {
     pr_info("LCD Driver: Removing device\n");
-    return 0;
 }
 
 static const struct i2c_device_id lcd_id[] = {

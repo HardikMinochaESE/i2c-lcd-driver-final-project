@@ -1,7 +1,10 @@
 obj-m += i2c-lcd-driver.o
 
+KERNEL_DIR ?= /lib/modules/$(shell uname -r)/build
+PWD := $(shell pwd)
+
 all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) modules
 
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean 
+	$(MAKE) -C $(KERNEL_DIR) M=$(PWD) clean 
