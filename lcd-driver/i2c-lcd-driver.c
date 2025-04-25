@@ -42,6 +42,9 @@
 #define LCD_5x8DOTS 0x00
 
 static struct i2c_client *lcd_client;
+static struct i2c_board_info lcd_board_info = {
+    I2C_BOARD_INFO("i2c-lcd", 0x27),
+};
 
 // Function to write a nibble to the LCD
 static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 mode)
@@ -94,6 +97,9 @@ static void lcd_init(struct i2c_client *client)
 
 static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
+    const char *msg1 = "Driver";
+    const char *msg2 = "Loaded";
+    
     pr_info("LCD Driver: Probing device\n");
     
     lcd_client = client;
@@ -101,13 +107,11 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     
     // Display "Driver Loaded" on the LCD
     lcd_write_byte(client, LCD_SET_DDRAM | 0x00, LCD_CMD); // Move to first line
-    const char *msg1 = "Driver";
     while (*msg1) {
         lcd_write_byte(client, *msg1++, LCD_DATA);
     }
     
     lcd_write_byte(client, LCD_SET_DDRAM | 0x40, LCD_CMD); // Move to second line
-    const char *msg2 = "Loaded";
     while (*msg2) {
         lcd_write_byte(client, *msg2++, LCD_DATA);
     }
@@ -189,8 +193,4 @@ module_exit(lcd_driver_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("HARDIK MINOCHA");
 MODULE_DESCRIPTION("I2C LCD 16x2 Display Driver");
-MODULE_VERSION("1.0");
-
-static struct i2c_board_info lcd_board_info = {
-    I2C_BOARD_INFO("i2c-lcd", 0x27),
-}; 
+MODULE_VERSION("1.0"); 
