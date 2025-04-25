@@ -1,6 +1,7 @@
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <linux/delay.h>
+#include <linux/i2c-dev.h>
 
 #define LCD_ADDR 0x27
 #define LCD_BACKLIGHT 0x08
@@ -147,15 +148,38 @@ static struct i2c_driver lcd_driver = {
 static int __init lcd_driver_init(void)
 {
     int ret;
+    struct i2c_adapter *adapter;
+    
+    // Get the I2C adapter for bus 1
+    adapter = i2c_get_adapter(1);
+    if (!adapter) {
+        pr_err("LCD Driver: Failed to get I2C adapter\n");
+        return -ENODEV;
+    }
+    
+    // Register the board info
+    lcd_client = i2c_new_client_device(adapter, &lcd_board_info);
+    if (!lcd_client) {
+        pr_err("LCD Driver: Failed to create I2C client\n");
+        i2c_put_adapter(adapter);
+        return -ENODEV;
+    }
+    
+    // Register the driver
     ret = i2c_register_driver(THIS_MODULE, &lcd_driver);
     if (ret == 0) {
         pr_info("LCD Driver: Ho gaya load bkl...\n");
     }
+    
+    i2c_put_adapter(adapter);
     return ret;
 }
 
 static void __exit lcd_driver_exit(void)
 {
+    if (lcd_client) {
+        i2c_unregister_device(lcd_client);
+    }
     i2c_del_driver(&lcd_driver);
 }
 
