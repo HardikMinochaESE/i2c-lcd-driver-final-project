@@ -144,6 +144,9 @@ static int __init lcd_driver_init(void)
     if (ret == 0) {
         pr_info("LCD Driver: Ho gaya load bkl...\n");
     }
+    lcd_init(lcd_client);
+    lcd_probe(lcd_client, LCD_ADDR);
+    pr_info("LCD pe print kr diya bkl...\n");
     return ret;
 }
 
