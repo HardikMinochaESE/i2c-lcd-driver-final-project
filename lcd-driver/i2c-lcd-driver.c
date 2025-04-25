@@ -127,10 +127,17 @@ static const struct i2c_device_id lcd_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, lcd_id);
 
+static const struct of_device_id lcd_of_match[] = {
+    { .compatible = "i2c-lcd" },
+    { }
+};
+MODULE_DEVICE_TABLE(of, lcd_of_match);
+
 static struct i2c_driver lcd_driver = {
     .driver = {
         .name = "i2c-lcd",
         .owner = THIS_MODULE,
+        .of_match_table = lcd_of_match,
     },
     .probe = lcd_probe,
     .remove = lcd_remove,
@@ -144,9 +151,6 @@ static int __init lcd_driver_init(void)
     if (ret == 0) {
         pr_info("LCD Driver: Ho gaya load bkl...\n");
     }
-    lcd_init(lcd_client);
-    lcd_probe(lcd_client, LCD_ADDR);
-    pr_info("LCD pe print kr diya bkl...\n");
     return ret;
 }
 
@@ -161,4 +165,8 @@ module_exit(lcd_driver_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("HARDIK MINOCHA");
 MODULE_DESCRIPTION("I2C LCD 16x2 Display Driver");
-MODULE_VERSION("1.0"); 
+MODULE_VERSION("1.0");
+
+static struct i2c_board_info lcd_board_info = {
+    I2C_BOARD_INFO("i2c-lcd", 0x27),
+}; 
