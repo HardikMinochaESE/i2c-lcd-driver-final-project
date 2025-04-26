@@ -111,7 +111,6 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     pr_info("LCD Driver: Probing device\n");
     
     lcd_client = client;
-    lcd_init(client);
     
     // Display "Driver" on the LCD
     pr_info("LCD Driver: Writing 'Driver' to first line\n");
@@ -176,6 +175,8 @@ static int __init lcd_driver_init(void)
     int ret;
     struct i2c_adapter *adapter;
     
+    pr_info("LCD Driver: Starting module initialization\n");
+    
     // Get the I2C adapter for bus 1
     adapter = i2c_get_adapter(1);
     if (!adapter) {
@@ -190,6 +191,9 @@ static int __init lcd_driver_init(void)
         i2c_put_adapter(adapter);
         return -ENODEV;
     }
+    
+    // Initialize the LCD
+    lcd_init(lcd_client);
     
     // Register the driver
     ret = i2c_register_driver(THIS_MODULE, &lcd_driver);
