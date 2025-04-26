@@ -73,11 +73,16 @@ static void lcd_init(struct i2c_client *client)
 
     // Initialize LCD in 4-bit mode
     lcd_write_nibble(client, 0x03, LCD_CMD);
-    msleep(5);
+    msleep(5);  // 4.1ms minimum
+    
     lcd_write_nibble(client, 0x03, LCD_CMD);
-    udelay(150);
+    udelay(150);  // 100us minimum
+    
     lcd_write_nibble(client, 0x03, LCD_CMD);
+    msleep(5);  // 4.1ms minimum
+    
     lcd_write_nibble(client, 0x02, LCD_CMD);
+    msleep(5);
 
     // Set 4-bit mode, 2 lines, 5x8 dots
     lcd_write_byte(client, LCD_FUNCTION_SET | LCD_4BIT_MODE | LCD_2LINE | LCD_5x8DOTS, LCD_CMD);
@@ -87,12 +92,12 @@ static void lcd_init(struct i2c_client *client)
     lcd_write_byte(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON | LCD_CURSOR_ON | LCD_BLINK_ON, LCD_CMD);
     msleep(5);
     
-    // Clear display
-    lcd_write_byte(client, LCD_CLEAR, LCD_CMD);
-    msleep(5);
-    
     // Set entry mode
     lcd_write_byte(client, LCD_ENTRY_MODE | LCD_ENTRY_LEFT, LCD_CMD);
+    msleep(5);
+    
+    // Clear display
+    lcd_write_byte(client, LCD_CLEAR, LCD_CMD);
     msleep(5);
     
     pr_info("LCD Driver: Initialization complete\n");
@@ -107,10 +112,6 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     
     lcd_client = client;
     lcd_init(client);
-    
-    // Clear display again before writing
-    lcd_write_byte(client, LCD_CLEAR, LCD_CMD);
-    msleep(5);
     
     // Display "Driver" on the LCD
     pr_info("LCD Driver: Writing 'Driver' to first line\n");
@@ -129,6 +130,13 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
         lcd_write_byte(client, *msg2++, LCD_DATA);
         msleep(5);
     }
+    
+    // Move cursor to end of first line and enable blinking
+    pr_info("LCD Driver: Enabling blinking cursor\n");
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x06, LCD_CMD); // Move cursor to end of "Driver"
+    msleep(5);
+    lcd_write_byte(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON | LCD_CURSOR_ON | LCD_BLINK_ON, LCD_CMD);
+    msleep(5);
     
     pr_info("LCD Driver: Display update complete\n");
     return 0;
