@@ -2,6 +2,8 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <linux/i2c-dev.h>
+#include <linux/timer.h>
+#include <linux/fs.h>
 
 #define LCD_ADDR 0x27
 
@@ -51,6 +53,9 @@ static struct i2c_client *lcd_client;
 static struct i2c_board_info lcd_board_info = {
     I2C_BOARD_INFO("i2c-lcd", LCD_ADDR),
 };
+
+static struct timer_list temp_timer;
+static char temp_buf[20];  // Buffer to store temperature string
 
 // Write a nibble to the LCD through PCF8574
 static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 rs) 
@@ -152,6 +157,69 @@ static void lcd_write_string(struct i2c_client *client, const char *str)
     }
 }
 
+// Function to read CPU temperature
+static int read_cpu_temp(void)
+{
+    struct file *f;
+    char buf[8];
+    int temp = 0;
+    loff_t pos = 0;
+
+    f = filp_open("/sys/class/thermal/thermal_zone0/temp", O_RDONLY, 0);
+    if (IS_ERR(f)) {
+        pr_err("LCD Driver: Failed to open temp file\n");
+        return -1;
+    }
+
+    // Read temperature value
+    kernel_read(f, buf, sizeof(buf), &pos);
+    filp_close(f, NULL);
+
+    // Convert string to integer (temperature is in millidegrees Celsius)
+    if (kstrtoint(buf, 10, &temp) < 0) {
+        pr_err("LCD Driver: Failed to parse temperature\n");
+        return -1;
+    }
+
+    return temp;  // Return raw value in millidegrees
+}
+
+// Function to update temperature display
+static void update_temperature(void)
+{
+    int temp;
+    int whole, decimal;
+    
+    // Read temperature
+    temp = read_cpu_temp();
+    if (temp < 0) {
+        return;
+    }
+
+    // Split into whole and decimal parts
+    whole = temp / 1000;         // Integer part
+    decimal = temp % 1000;       // Decimal part
+
+    // Format temperature string with 3 decimal places
+    snprintf(temp_buf, sizeof(temp_buf), "Deg_C: %d.%03d", whole, decimal);
+
+    // Set cursor to second line
+    lcd_command(lcd_client, LCD_SET_DDRAM | 0x40);
+    msleep(1);
+
+    // Write temperature
+    lcd_write_string(lcd_client, temp_buf);
+}
+
+// Timer callback function
+static void temp_timer_callback(struct timer_list *t)
+{
+    update_temperature();
+    
+    // Reset timer for next update (5 seconds)
+    mod_timer(&temp_timer, jiffies + msecs_to_jiffies(5000));
+}
+
 static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     pr_info("LCD Driver: Probing device\n");
@@ -163,18 +231,15 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     msleep(10);  // Wait after init
     
     // Set cursor to first line
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0);
-    udelay(100);
+    lcd_command(client, LCD_SET_DDRAM | 0x00);
+    msleep(1);
     
     // Write first line
-    lcd_write_string(client, "Driver");
+    lcd_write_string(client, "CPU Temp Monitor");
     
-    // Set cursor to second line
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0);
-    udelay(100);
-    
-    // Write second line
-    lcd_write_string(client, "Loaded");
+    // Initialize and start timer
+    timer_setup(&temp_timer, temp_timer_callback, 0);
+    mod_timer(&temp_timer, jiffies + msecs_to_jiffies(1000));  // First update after 1 second
     
     pr_info("LCD Driver: Display update complete\n");
     return 0;
@@ -183,6 +248,7 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 static int lcd_remove(struct i2c_client *client)
 {
     pr_info("LCD Driver: Removing device\n");
+    del_timer_sync(&temp_timer);  // Clean up timer
     return 0;
 }
 
