@@ -5,6 +5,9 @@
 #include <linux/timer.h>
 #include <linux/fs.h>
 #include <linux/firmware.h>
+#include <linux/sysfs.h>
+#include <linux/kobject.h>
+#include <linux/thermal.h>
 
 #define LCD_ADDR 0x27
 
@@ -56,7 +59,6 @@ static struct i2c_board_info lcd_board_info = {
 };
 
 static struct timer_list temp_timer;
-static char temp_buf[20];  // Buffer to store temperature string
 
 // Write a nibble to the LCD through PCF8574
 static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 rs) 
@@ -161,27 +163,37 @@ static void lcd_write_string(struct i2c_client *client, const char *str)
 // Function to read CPU temperature
 static int read_cpu_temp(void)
 {
+    struct file *f;
     char buf[32];
-    const char *path = "/sys/class/thermal/thermal_zone0/temp";
-    int ret, temp;
-    
-    ret = kernel_read_file_from_path(path, 0, (void **)&buf, 32, NULL,
-                                    READING_FIRMWARE);
-    if (ret < 0) {
-        pr_err("LCD Driver: Failed to read temperature file: %d\n", ret);
+    int temp = 0;
+    loff_t pos = 0;
+    ssize_t bytes_read;
+
+    f = filp_open("/sys/class/thermal/thermal_zone0/temp", O_RDONLY, 0);
+    if (IS_ERR(f)) {
+        pr_err("LCD Driver: Failed to open temp file\n");
         return -1;
     }
 
-    // Ensure string is null-terminated
-    buf[ret] = '\0';
+    bytes_read = kernel_read(f, buf, sizeof(buf) - 1, &pos);
+    filp_close(f, NULL);
 
-    // Convert string to integer
+    if (bytes_read <= 0) {
+        pr_err("LCD Driver: Failed to read temperature\n");
+        return -1;
+    }
+
+    // Ensure string is null-terminated and remove newline
+    buf[bytes_read] = '\0';
+    if (bytes_read > 0 && buf[bytes_read-1] == '\n')
+        buf[bytes_read-1] = '\0';
+
     if (kstrtoint(buf, 10, &temp) < 0) {
         pr_err("LCD Driver: Failed to parse temperature: %s\n", buf);
         return -1;
     }
 
-    return temp;  // Return raw value in millidegrees
+    return temp;  // Temperature in millicelsius
 }
 
 // Function to update temperature display
@@ -196,8 +208,6 @@ static void update_temperature(void)
         pr_err("LCD Driver: Failed to get temperature\n");
         return;
     }
-
-    pr_info("LCD Driver: Read temperature: %d\n", temp);
 
     // Split into whole and decimal parts
     whole = temp / 1000;         // Integer part
