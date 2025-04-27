@@ -4,6 +4,7 @@
 #include <linux/i2c-dev.h>
 #include <linux/timer.h>
 #include <linux/fs.h>
+#include <linux/firmware.h>
 
 #define LCD_ADDR 0x27
 
@@ -160,34 +161,19 @@ static void lcd_write_string(struct i2c_client *client, const char *str)
 // Function to read CPU temperature
 static int read_cpu_temp(void)
 {
-    struct file *f;
-    char buf[32];  // Increased buffer size
-    ssize_t bytes_read;
-    int temp = 0;
-    loff_t pos = 0;
-
-    f = filp_open("/sys/class/thermal/thermal_zone0/temp", O_RDONLY, 0);
-    if (IS_ERR(f)) {
-        pr_err("LCD Driver: Failed to open temp file\n");
-        return -1;
-    }
-
-    // Read temperature value
-    memset(buf, 0, sizeof(buf));  // Clear buffer
-    bytes_read = kernel_read(f, buf, sizeof(buf) - 1, &pos);
-    filp_close(f, NULL);
-
-    if (bytes_read <= 0) {
-        pr_err("LCD Driver: Failed to read temperature\n");
+    char buf[32];
+    const char *path = "/sys/class/thermal/thermal_zone0/temp";
+    int ret, temp;
+    
+    ret = kernel_read_file_from_path(path, 0, (void **)&buf, 32, NULL,
+                                    READING_FIRMWARE);
+    if (ret < 0) {
+        pr_err("LCD Driver: Failed to read temperature file: %d\n", ret);
         return -1;
     }
 
     // Ensure string is null-terminated
-    buf[bytes_read] = '\0';
-
-    // Remove any trailing newline
-    if (bytes_read > 0 && buf[bytes_read-1] == '\n')
-        buf[bytes_read-1] = '\0';
+    buf[ret] = '\0';
 
     // Convert string to integer
     if (kstrtoint(buf, 10, &temp) < 0) {
@@ -207,12 +193,17 @@ static void update_temperature(void)
     // Read temperature
     temp = read_cpu_temp();
     if (temp < 0) {
+        pr_err("LCD Driver: Failed to get temperature\n");
         return;
     }
+
+    pr_info("LCD Driver: Read temperature: %d\n", temp);
 
     // Split into whole and decimal parts
     whole = temp / 1000;         // Integer part
     decimal = temp % 1000;       // Decimal part
+
+    pr_info("LCD Driver: Displaying temperature %d.%03d\n", whole, decimal);
 
     // Set cursor to second line
     lcd_command(lcd_client, LCD_SET_DDRAM | 0x40);
