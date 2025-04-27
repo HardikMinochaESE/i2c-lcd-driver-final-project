@@ -161,7 +161,8 @@ static void lcd_write_string(struct i2c_client *client, const char *str)
 static int read_cpu_temp(void)
 {
     struct file *f;
-    char buf[8];
+    char buf[32];  // Increased buffer size
+    ssize_t bytes_read;
     int temp = 0;
     loff_t pos = 0;
 
@@ -172,12 +173,25 @@ static int read_cpu_temp(void)
     }
 
     // Read temperature value
-    kernel_read(f, buf, sizeof(buf), &pos);
+    memset(buf, 0, sizeof(buf));  // Clear buffer
+    bytes_read = kernel_read(f, buf, sizeof(buf) - 1, &pos);
     filp_close(f, NULL);
 
-    // Convert string to integer (temperature is in millidegrees Celsius)
+    if (bytes_read <= 0) {
+        pr_err("LCD Driver: Failed to read temperature\n");
+        return -1;
+    }
+
+    // Ensure string is null-terminated
+    buf[bytes_read] = '\0';
+
+    // Remove any trailing newline
+    if (bytes_read > 0 && buf[bytes_read-1] == '\n')
+        buf[bytes_read-1] = '\0';
+
+    // Convert string to integer
     if (kstrtoint(buf, 10, &temp) < 0) {
-        pr_err("LCD Driver: Failed to parse temperature\n");
+        pr_err("LCD Driver: Failed to parse temperature: %s\n", buf);
         return -1;
     }
 
@@ -200,15 +214,24 @@ static void update_temperature(void)
     whole = temp / 1000;         // Integer part
     decimal = temp % 1000;       // Decimal part
 
-    // Format temperature string with 3 decimal places
-    snprintf(temp_buf, sizeof(temp_buf), "Deg_C: %d.%03d", whole, decimal);
-
     // Set cursor to second line
     lcd_command(lcd_client, LCD_SET_DDRAM | 0x40);
     msleep(1);
 
-    // Write temperature
-    lcd_write_string(lcd_client, temp_buf);
+    // Write "Deg_C: "
+    lcd_write_string(lcd_client, "Deg_C: ");
+
+    // Write whole number part
+    lcd_data(lcd_client, (whole / 10) + '0');  // Tens digit
+    lcd_data(lcd_client, (whole % 10) + '0');  // Ones digit
+    
+    // Write decimal point
+    lcd_data(lcd_client, '.');
+    
+    // Write decimal part
+    lcd_data(lcd_client, ((decimal / 100) % 10) + '0');  // Tenths
+    lcd_data(lcd_client, ((decimal / 10) % 10) + '0');   // Hundredths
+    lcd_data(lcd_client, (decimal % 10) + '0');          // Thousandths
 }
 
 // Timer callback function
