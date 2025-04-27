@@ -105,31 +105,31 @@ static void lcd_init(struct i2c_client *client)
     pr_info("LCD Driver: Starting initialization\n");
     
     // Wait for power up (>15ms)
-    msleep(20);
+    msleep(50);
 
-    // Initialize to 4-bit mode
-    lcd_write_byte(client, 0x02, 0);
-    msleep(1);
+    // Initialize in 4-bit mode
+    lcd_write_byte(client, 0x02, 0);  // 4-bit mode
+    msleep(5);
     
-    // Initialize LCD: 2 lines, 5x8 font, 4-bit mode
+    // Function Set: 2-line, 4-bit mode, 5x8 dots (0x28)
     lcd_write_byte(client, 0x28, 0);
-    msleep(1);
+    msleep(5);
     
-    // Display ON, Cursor OFF
+    // Display ON, Cursor OFF (0x0C)
     lcd_write_byte(client, 0x0C, 0);
-    msleep(1);
+    msleep(5);
     
-    // Entry Mode: Auto Increment cursor
+    // Entry Mode Set: Increment cursor (0x06)
     lcd_write_byte(client, 0x06, 0);
-    msleep(1);
+    msleep(5);
     
-    // Clear display
+    // Clear Display (0x01)
     lcd_write_byte(client, 0x01, 0);
-    msleep(2);  // Clear needs a longer delay
+    msleep(5);
     
-    // Set cursor to home position
+    // Set cursor to home position (0x80)
     lcd_write_byte(client, 0x80, 0);
-    msleep(1);
+    msleep(5);
 
     pr_info("LCD Driver: Initialization complete\n");
 }
@@ -157,14 +157,14 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     udelay(100);
     
     // Write first line
-    lcd_write_string(client, "Driver");
+    // lcd_write_string(client, "Driver");
     
     // Set cursor to second line
     lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0);
     udelay(100);
     
     // Write second line
-    lcd_write_string(client, "Loaded");
+    //lcd_write_string(client, "Loaded");
     
     pr_info("LCD Driver: Display update complete\n");
     return 0;
