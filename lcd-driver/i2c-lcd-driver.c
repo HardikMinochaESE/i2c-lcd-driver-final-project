@@ -6,9 +6,14 @@
 #define LCD_ADDR 0x27
 
 // PCF8574 Pin Definitions for LCD
-#define PIN_RS    (1 << 6)  // P6
-#define PIN_RW    (1 << 5)  // P5
-#define PIN_EN    (1 << 4)  // P4
+#define PIN_RS      (1 << 0)  // P0 - Register Select
+#define PIN_RW      (1 << 1)  // P1 - Read/Write
+#define PIN_EN      (1 << 2)  // P2 - Enable
+#define PIN_BL      (1 << 3)  // P3 - Backlight
+#define PIN_D4      (1 << 4)  // P4 - Data 4
+#define PIN_D5      (1 << 5)  // P5 - Data 5
+#define PIN_D6      (1 << 6)  // P6 - Data 6
+#define PIN_D7      (1 << 7)  // P7 - Data 7
 
 // LCD Commands
 #define LCD_CLEAR 0x01
@@ -52,24 +57,28 @@ static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 rs)
 {
     u8 data;
     
-    // Step 1: Set RS first with EN=0
-    data = (rs ? PIN_RS : 0);
+    // Prepare data with backlight ON
+    data = PIN_BL;  // Keep backlight on
+    
+    // Set RS and R/W (R/W is always 0 for write)
+    if (rs) data |= PIN_RS;
+    
+    // Map the nibble to D4-D7 pins
+    if (nibble & 0x01) data |= PIN_D4;
+    if (nibble & 0x02) data |= PIN_D5;
+    if (nibble & 0x04) data |= PIN_D6;
+    if (nibble & 0x08) data |= PIN_D7;
+    
+    // Write with EN=0
     i2c_smbus_write_byte(client, data);
     udelay(1);
     
-    // Step 2: Set data bits while keeping RS
-    data = (nibble & 0x0F) | (rs ? PIN_RS : 0);
-    i2c_smbus_write_byte(client, data);
-    udelay(1);  // Ensure data is stable
-    
-    // Step 3: Set EN high - LCD reads data on this edge
+    // Write with EN=1
     i2c_smbus_write_byte(client, data | PIN_EN);
     udelay(1);  // Min 450ns required
     
-    // Step 4: Set EN low
+    // Write with EN=0
     i2c_smbus_write_byte(client, data);
-    
-    // Step 5: Wait for command to complete
     udelay(100);  // Commands need > 37us to settle
 }
 
@@ -108,8 +117,8 @@ static void lcd_init(struct i2c_client *client)
     msleep(50);
 
     // Initialize in 4-bit mode
-    // lcd_command(client, 0x02);  // 4-bit mode
-    // msleep(5);
+    lcd_command(client, 0x02);  // 4-bit mode
+    msleep(5);
     
     // Function Set: 2-line, 4-bit mode, 5x8 dots (0x28)
     lcd_command(client, 0x28);
@@ -120,12 +129,12 @@ static void lcd_init(struct i2c_client *client)
     msleep(5);
     
     // Entry Mode Set: Increment cursor (0x06)
-    // lcd_command(client, 0x06);
-    // msleep(5);
+    lcd_command(client, 0x06);
+    msleep(5);
     
     // Clear Display (0x01)
-    // lcd_command(client, 0x01);
-    // msleep(5);
+    lcd_command(client, 0x01);
+    msleep(5);
     
     // Set cursor to home position (0x80)
     lcd_command(client, 0x80);
