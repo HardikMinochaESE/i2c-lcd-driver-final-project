@@ -124,8 +124,8 @@ static void lcd_init(struct i2c_client *client)
     msleep(5);
     
     // Clear Display (0x01)
-    lcd_write_byte(client, 0x01, 0);
-    msleep(5);
+    // lcd_write_byte(client, 0x01, 0);
+    // msleep(5);
     
     // Set cursor to home position (0x80)
     lcd_write_byte(client, 0x80, 0);
@@ -153,8 +153,8 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     msleep(10);  // Wait after init
     
     // // Set cursor to first line
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0);
-    udelay(100);
+    // lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0);
+    // udelay(100);
     
     // // Write first line
     // // lcd_write_string(client, "Driver");
