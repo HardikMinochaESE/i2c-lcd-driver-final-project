@@ -158,7 +158,7 @@ static void lcd_init(struct i2c_client *client)
     pr_info("LCD Driver: Initialization complete\n");
 }
 
-// Sysfs store function - called when userspace writes to the sysfs file
+// Sysfs update function - called when userspace writes to the sysfs file
 static ssize_t lcd_data_update(struct device *dev, struct device_attribute *attr,
                              const char *buf, size_t count)
 {
@@ -198,8 +198,14 @@ static ssize_t lcd_data_update(struct device *dev, struct device_attribute *attr
     return count;
 }
 
-// Define sysfs attribute
-static DEVICE_ATTR_WO(lcd_data);  // Write-only attribute
+// Define the sysfs attribute manually instead of using DEVICE_ATTR_WO
+static struct device_attribute dev_attr_lcd_data = {
+    .attr = {
+        .name = "lcd_data_feed",
+        .mode = 0220  // S_IWUSR | S_IWGRP (write permission for user and group)
+    },
+    .store = lcd_data_update,
+};
 
 static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -217,8 +223,8 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     lcd_command(client, LCD_SET_DDRAM | 0x00);
     msleep(1);
     lcd_write_string(client, "CPU Temp Monitor");
-
-        lcd_command(client, LCD_SET_DDRAM | 0x40);  // Second line
+    
+    lcd_command(client, LCD_SET_DDRAM | 0x40);  // Second line
     msleep(1);
     lcd_write_string(client, "Initialized!");
     
@@ -234,7 +240,7 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     // Create sysfs device
     lcd_device = device_create(lcd_class, NULL, 0, NULL, "lcd_device");
     if (IS_ERR(lcd_device)) {
-        pr_err("LCD Driver: Failed to create sysfs device\n");
+        pr_err("LCD Driver: Failed to create sysfs class\n");
         class_destroy(lcd_class);
         return PTR_ERR(lcd_device);
     }
@@ -248,7 +254,7 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
         return ret;
     }
 
-    pr_info("LCD Driver: Sysfs interface created at /sys/class/LCD162/lcd_device/lcd_data\n");
+    pr_info("LCD Driver: Sysfs interface created at /sys/class/LCD162/lcd_device/lcd_data_feed\n");
     return 0;
 }
 
