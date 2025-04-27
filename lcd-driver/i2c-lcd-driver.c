@@ -44,7 +44,7 @@
 
 static struct i2c_client *lcd_client;
 static struct i2c_board_info lcd_board_info = {
-    I2C_BOARD_INFO("i2c-lcd", 0x27),
+    I2C_BOARD_INFO("i2c-lcd", LCD_ADDR),
 };
 
 // Write a nibble to the LCD through PCF8574
@@ -108,28 +108,30 @@ static void lcd_init(struct i2c_client *client)
     msleep(50);
 
     // Initialize in 4-bit mode
-    lcd_write_byte(client, 0x02, 0);  // 4-bit mode
-    msleep(5);
+    // lcd_command(client, 0x02);  // 4-bit mode
+    // msleep(5);
     
     // Function Set: 2-line, 4-bit mode, 5x8 dots (0x28)
-    lcd_write_byte(client, 0x28, 0);
+    lcd_command(client, 0x28);
     msleep(5);
     
     // Display ON, Cursor OFF (0x0C)
-    lcd_write_byte(client, 0x0C, 0);
+    lcd_command(client, 0x0C);
     msleep(5);
     
     // Entry Mode Set: Increment cursor (0x06)
-    lcd_write_byte(client, 0x06, 0);
-    msleep(5);
+    // lcd_command(client, 0x06);
+    // msleep(5);
     
     // Clear Display (0x01)
-    lcd_write_byte(client, 0x01, 0);
-    msleep(5);
+    // lcd_command(client, 0x01);
+    // msleep(5);
     
     // Set cursor to home position (0x80)
-    lcd_write_byte(client, 0x81, 0);
+    lcd_command(client, 0x80);
     msleep(5);
+
+    lcd_data(client, 'H');
 
     pr_info("LCD Driver: Initialization complete\n");
 }
