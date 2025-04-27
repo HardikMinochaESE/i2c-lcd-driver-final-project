@@ -124,8 +124,8 @@ static void lcd_init(struct i2c_client *client)
     lcd_command(client, 0x28);
     msleep(5);
     
-    // Display ON, Cursor OFF (0x0C)
-    lcd_command(client, 0x0C);
+    // Display ON, Cursor Blinking (0x0F)
+    lcd_command(client, 0x0F);
     msleep(5);
     
     // Entry Mode Set: Increment cursor (0x06)
@@ -140,7 +140,6 @@ static void lcd_init(struct i2c_client *client)
     lcd_command(client, 0x80);
     msleep(5);
 
-    lcd_data(client, 'H');
 
     pr_info("LCD Driver: Initialization complete\n");
 }
@@ -159,23 +158,23 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     
     lcd_client = client;
     
-    // // Initialize LCD
-    // lcd_init(client);
-    // msleep(10);  // Wait after init
+    // Initialize LCD
+    lcd_init(client);
+    msleep(10);  // Wait after init
     
-    // // Set cursor to first line
-    // lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0);
-    // udelay(100);
+    // Set cursor to first line
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0);
+    udelay(100);
     
-    // // Write first line
-    // // lcd_write_string(client, "Driver");
+    // Write first line
+    lcd_write_string(client, "Driver");
     
-    // // Set cursor to second line
-    // lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0);
-    // udelay(100);
+    // Set cursor to second line
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0);
+    udelay(100);
     
-    // // Write second line
-    // //lcd_write_string(client, "Loaded");
+    // Write second line
+    lcd_write_string(client, "Loaded");
     
     pr_info("LCD Driver: Display update complete\n");
     return 0;
