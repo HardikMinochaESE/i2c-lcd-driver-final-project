@@ -68,37 +68,38 @@ static void lcd_init(struct i2c_client *client)
 {
     pr_info("LCD Driver: Starting initialization\n");
     
-    // Wait for LCD to power up
-    msleep(50);
-
+    // Initial power up delay
+    msleep(30);
+    
     // Initialize LCD in 4-bit mode
     lcd_write_nibble(client, 0x03, LCD_CMD);
-    msleep(5);  // 4.1ms minimum
-    
-    lcd_write_nibble(client, 0x03, LCD_CMD);
-    udelay(150);  // 100us minimum
-    
-    lcd_write_nibble(client, 0x03, LCD_CMD);
-    msleep(5);  // 4.1ms minimum
-    
-    lcd_write_nibble(client, 0x02, LCD_CMD);
     msleep(5);
-
+    
+    lcd_write_nibble(client, 0x03, LCD_CMD);
+    msleep(5);
+    
+    lcd_write_nibble(client, 0x03, LCD_CMD);
+    msleep(5);
+    
+    // Return home
+    lcd_write_byte(client, LCD_HOME, LCD_CMD);
+    msleep(5);
+    
     // Set 4-bit mode, 2 lines, 5x8 dots
     lcd_write_byte(client, LCD_FUNCTION_SET | LCD_4BIT_MODE | LCD_2LINE | LCD_5x8DOTS, LCD_CMD);
-    msleep(5);
+    msleep(50);
     
-    // Turn on display with cursor blinking
-    lcd_write_byte(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON | LCD_CURSOR_ON | LCD_BLINK_ON, LCD_CMD);
-    msleep(5);
-    
-    // Set entry mode
-    lcd_write_byte(client, LCD_ENTRY_MODE | LCD_ENTRY_LEFT, LCD_CMD);
-    msleep(5);
+    // Turn on display
+    lcd_write_byte(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON, LCD_CMD);
+    msleep(50);
     
     // Clear display
     lcd_write_byte(client, LCD_CLEAR, LCD_CMD);
-    msleep(5);
+    msleep(50);
+    
+    // Set entry mode
+    lcd_write_byte(client, LCD_ENTRY_MODE | LCD_ENTRY_LEFT, LCD_CMD);
+    msleep(50);
     
     pr_info("LCD Driver: Initialization complete\n");
 }
