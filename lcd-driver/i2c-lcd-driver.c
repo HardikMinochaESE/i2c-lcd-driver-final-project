@@ -4,10 +4,11 @@
 #include <linux/i2c-dev.h>
 
 #define LCD_ADDR 0x27
-#define LCD_BACKLIGHT 0x08
-#define LCD_ENABLE 0x04
-#define LCD_CMD 0x00
-#define LCD_DATA 0x01
+
+// PCF8574 Pin Definitions for LCD
+#define PIN_RS    (1 << 6)  // P6
+#define PIN_RW    (1 << 5)  // P5
+#define PIN_EN    (1 << 4)  // P4
 
 // LCD Commands
 #define LCD_CLEAR 0x01
@@ -46,21 +47,56 @@ static struct i2c_board_info lcd_board_info = {
     I2C_BOARD_INFO("i2c-lcd", 0x27),
 };
 
-// Function to write a nibble to the LCD
-static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 mode)
+// Write a nibble to the LCD through PCF8574
+static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 rs) 
 {
-    u8 data = nibble | mode | LCD_BACKLIGHT;
-    i2c_smbus_write_byte(client, data | LCD_ENABLE);
+    u8 data;
+    
+    // Step 1: Set RS first with EN=0
+    data = (rs ? PIN_RS : 0);
+    i2c_smbus_write_byte(client, data);
     udelay(1);
-    i2c_smbus_write_byte(client, data & ~LCD_ENABLE);
-    udelay(50);
+    
+    // Step 2: Set data bits while keeping RS
+    data = (nibble & 0x0F) | (rs ? PIN_RS : 0);
+    i2c_smbus_write_byte(client, data);
+    udelay(1);  // Ensure data is stable
+    
+    // Step 3: Set EN high - LCD reads data on this edge
+    i2c_smbus_write_byte(client, data | PIN_EN);
+    udelay(1);  // Min 450ns required
+    
+    // Step 4: Set EN low
+    i2c_smbus_write_byte(client, data);
+    
+    // Step 5: Wait for command to complete
+    udelay(100);  // Commands need > 37us to settle
 }
 
-// Function to write a byte to the LCD
-static void lcd_write_byte(struct i2c_client *client, u8 byte, u8 mode)
+// Write a byte to the LCD (either command or data)
+static void lcd_write_byte(struct i2c_client *client, u8 byte, u8 rs)
 {
-    lcd_write_nibble(client, byte >> 4, mode);
-    lcd_write_nibble(client, byte & 0x0F, mode);
+    // Write high nibble first
+    lcd_write_nibble(client, byte >> 4, rs);
+    
+    // Then write low nibble
+    lcd_write_nibble(client, byte & 0x0F, rs);
+    
+    // Extra delay for certain commands
+    if (byte == LCD_CLEAR || byte == LCD_HOME)
+        msleep(2);  // These commands need longer delay
+}
+
+// Write a command to LCD
+static void lcd_command(struct i2c_client *client, u8 cmd)
+{
+    lcd_write_byte(client, cmd, 0);  // RS = 0 for command
+}
+
+// Write data to LCD
+static void lcd_data(struct i2c_client *client, u8 data)
+{
+    lcd_write_byte(client, data, 1);  // RS = 1 for data
 }
 
 // Function to initialize the LCD
@@ -68,38 +104,28 @@ static void lcd_init(struct i2c_client *client)
 {
     pr_info("LCD Driver: Starting initialization\n");
     
-    // Initial power up delay
-    msleep(30);
-    
-    // Initialize LCD in 4-bit mode
-    lcd_write_nibble(client, 0x03, LCD_CMD);
-    msleep(5);
-    
-    lcd_write_nibble(client, 0x03, LCD_CMD);
-    msleep(5);
-    
-    lcd_write_nibble(client, 0x03, LCD_CMD);
-    msleep(5);
-    
-    // Return home
-    lcd_write_byte(client, LCD_HOME, LCD_CMD);
-    msleep(5);
-    
-    // Set 4-bit mode, 2 lines, 5x8 dots
-    lcd_write_byte(client, LCD_FUNCTION_SET | LCD_4BIT_MODE | LCD_2LINE | LCD_5x8DOTS, LCD_CMD);
+    // Wait for power up
     msleep(50);
     
-    // Turn on display
-    lcd_write_byte(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON, LCD_CMD);
-    msleep(50);
+    // Initialize in 4-bit mode according to datasheet
+    lcd_write_nibble(client, 0x03, 0);
+    msleep(5);
+    lcd_write_nibble(client, 0x03, 0);
+    udelay(150);
+    lcd_write_nibble(client, 0x03, 0);
+    msleep(5);
+    lcd_write_nibble(client, 0x02, 0);  // Finally set to 4-bit mode
+    msleep(5);
     
-    // Clear display
-    lcd_write_byte(client, LCD_CLEAR, LCD_CMD);
-    msleep(50);
-    
-    // Set entry mode
-    lcd_write_byte(client, LCD_ENTRY_MODE | LCD_ENTRY_LEFT, LCD_CMD);
-    msleep(50);
+    // Now configure the LCD
+    lcd_command(client, LCD_FUNCTION_SET | LCD_4BIT_MODE | LCD_2LINE | LCD_5x8DOTS);
+    msleep(5);
+    lcd_command(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON);
+    msleep(5);
+    lcd_command(client, LCD_CLEAR);
+    msleep(5);
+    lcd_command(client, LCD_ENTRY_MODE | LCD_ENTRY_LEFT);
+    msleep(5);
     
     pr_info("LCD Driver: Initialization complete\n");
 }
@@ -115,27 +141,27 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     
     // Display "Driver" on the LCD
     pr_info("LCD Driver: Writing 'Driver' to first line\n");
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, LCD_CMD); // Move to first line
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0); // Move to first line
     msleep(5);
     while (*msg1) {
-        lcd_write_byte(client, *msg1++, LCD_DATA);
+        lcd_write_byte(client, *msg1++, 1);
         msleep(5);
     }
     
     // Display "Loaded" on the LCD
     pr_info("LCD Driver: Writing 'Loaded' to second line\n");
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x40, LCD_CMD); // Move to second line
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0); // Move to second line
     msleep(5);
     while (*msg2) {
-        lcd_write_byte(client, *msg2++, LCD_DATA);
+        lcd_write_byte(client, *msg2++, 1);
         msleep(5);
     }
     
     // Move cursor to end of first line and enable blinking
     pr_info("LCD Driver: Enabling blinking cursor\n");
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x06, LCD_CMD); // Move cursor to end of "Driver"
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x06, 0); // Move cursor to end of "Driver"
     msleep(5);
-    lcd_write_byte(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON | LCD_CURSOR_ON | LCD_BLINK_ON, LCD_CMD);
+    lcd_write_byte(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON | LCD_CURSOR_ON | LCD_BLINK_ON, 0);
     msleep(5);
     
     pr_info("LCD Driver: Display update complete\n");
