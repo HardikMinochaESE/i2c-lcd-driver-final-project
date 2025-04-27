@@ -128,7 +128,7 @@ static void lcd_init(struct i2c_client *client)
     msleep(5);
     
     // Set cursor to home position (0x80)
-    lcd_write_byte(client, 0x80, 0);
+    lcd_write_byte(client, 0x81, 0);
     msleep(5);
 
     pr_info("LCD Driver: Initialization complete\n");
