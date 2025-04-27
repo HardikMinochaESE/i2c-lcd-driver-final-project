@@ -6,6 +6,7 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 #include <linux/string.h>
+#include <linux/device.h>
 
 #define LCD_ADDR 0x27
 
@@ -57,16 +58,17 @@ static struct i2c_board_info lcd_board_info = {
 };
 
 static struct timer_list update_timer;
-static struct kobject *lcd_kobj;
+static struct class *lcd_class;
+static struct device *lcd_device;
 static int current_temp = 0;
 
 // Sysfs attribute show/store functions
-static ssize_t temp_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+static ssize_t temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     return sprintf(buf, "%d\n", current_temp);
 }
 
-static ssize_t temp_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+static ssize_t temp_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     int ret;
     int temp;
@@ -79,8 +81,7 @@ static ssize_t temp_store(struct kobject *kobj, struct kobj_attribute *attr, con
     return count;
 }
 
-static struct kobj_attribute temp_attribute = 
-    __ATTR(lcd_data_feed, 0664, temp_show, temp_store);
+static DEVICE_ATTR(lcd_data_feed, 0664, temp_show, temp_store);
 
 // Write a nibble to the LCD through PCF8574
 static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 rs) 
@@ -233,17 +234,27 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     msleep(1);
     lcd_write_string(client, "CPU Temp Monitor");
     
-    // Create sysfs entry
-    lcd_kobj = kobject_create_and_add("extra_io", NULL);
-    if (!lcd_kobj) {
-        pr_err("LCD Driver: Failed to create sysfs kobject\n");
-        return -ENOMEM;
+    // Create class
+    lcd_class = class_create(THIS_MODULE, "lcd_class");
+    if (IS_ERR(lcd_class)) {
+        pr_err("LCD Driver: Failed to create class\n");
+        return PTR_ERR(lcd_class);
     }
 
-    ret = sysfs_create_file(lcd_kobj, &temp_attribute.attr);
+    // Create device
+    lcd_device = device_create(lcd_class, NULL, MKDEV(0, 0), NULL, "lcd_dev");
+    if (IS_ERR(lcd_device)) {
+        pr_err("LCD Driver: Failed to create device\n");
+        class_destroy(lcd_class);
+        return PTR_ERR(lcd_device);
+    }
+
+    // Create sysfs attribute
+    ret = device_create_file(lcd_device, &dev_attr_lcd_data_feed);
     if (ret) {
         pr_err("LCD Driver: Failed to create sysfs file\n");
-        kobject_put(lcd_kobj);
+        device_destroy(lcd_class, MKDEV(0, 0));
+        class_destroy(lcd_class);
         return ret;
     }
 
@@ -262,10 +273,13 @@ static int lcd_remove(struct i2c_client *client)
     // Clean up timer
     del_timer_sync(&update_timer);
     
-    // Clean up sysfs
-    if (lcd_kobj) {
-        sysfs_remove_file(lcd_kobj, &temp_attribute.attr);
-        kobject_put(lcd_kobj);
+    // Clean up sysfs and class
+    if (lcd_device) {
+        device_remove_file(lcd_device, &dev_attr_lcd_data_feed);
+        device_destroy(lcd_class, MKDEV(0, 0));
+    }
+    if (lcd_class) {
+        class_destroy(lcd_class);
     }
     
     return 0;
