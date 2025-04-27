@@ -104,65 +104,67 @@ static void lcd_init(struct i2c_client *client)
 {
     pr_info("LCD Driver: Starting initialization\n");
     
-    // Wait for power up
-    msleep(50);
+    // Wait for power up (>15ms)
+    msleep(20);
+
+    // Initialize to 4-bit mode
+    lcd_write_byte(client, 0x02, 0);
+    msleep(1);
     
-    // Initialize in 4-bit mode according to datasheet
-    lcd_write_nibble(client, 0x03, 0);
-    msleep(5);
-    lcd_write_nibble(client, 0x03, 0);
-    udelay(150);
-    lcd_write_nibble(client, 0x03, 0);
-    msleep(5);
-    lcd_write_nibble(client, 0x02, 0);  // Finally set to 4-bit mode
-    msleep(5);
+    // Initialize LCD: 2 lines, 5x8 font, 4-bit mode
+    lcd_write_byte(client, 0x28, 0);
+    msleep(1);
     
-    // Now configure the LCD
-    lcd_command(client, LCD_FUNCTION_SET | LCD_4BIT_MODE | LCD_2LINE | LCD_5x8DOTS);
-    msleep(5);
-    lcd_command(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON);
-    msleep(5);
-    lcd_command(client, LCD_CLEAR);
-    msleep(5);
-    lcd_command(client, LCD_ENTRY_MODE | LCD_ENTRY_LEFT);
-    msleep(5);
+    // Display ON, Cursor OFF
+    lcd_write_byte(client, 0x0C, 0);
+    msleep(1);
     
+    // Entry Mode: Auto Increment cursor
+    lcd_write_byte(client, 0x06, 0);
+    msleep(1);
+    
+    // Clear display
+    lcd_write_byte(client, 0x01, 0);
+    msleep(2);  // Clear needs a longer delay
+    
+    // Set cursor to home position
+    lcd_write_byte(client, 0x80, 0);
+    msleep(1);
+
     pr_info("LCD Driver: Initialization complete\n");
+}
+
+static void lcd_write_string(struct i2c_client *client, const char *str)
+{
+    while (*str) {
+        lcd_write_byte(client, *str++, 1);  // RS=1 for data
+        udelay(100);  // Give LCD time to process each char
+    }
 }
 
 static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-    const char *msg1 = "Driver";
-    const char *msg2 = "Loaded";
-    
     pr_info("LCD Driver: Probing device\n");
     
     lcd_client = client;
     
-    // Display "Driver" on the LCD
-    pr_info("LCD Driver: Writing 'Driver' to first line\n");
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0); // Move to first line
-    msleep(5);
-    while (*msg1) {
-        lcd_write_byte(client, *msg1++, 1);
-        msleep(5);
-    }
+    // Initialize LCD
+    lcd_init(client);
+    msleep(10);  // Wait after init
     
-    // Display "Loaded" on the LCD
-    pr_info("LCD Driver: Writing 'Loaded' to second line\n");
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0); // Move to second line
-    msleep(5);
-    while (*msg2) {
-        lcd_write_byte(client, *msg2++, 1);
-        msleep(5);
-    }
+    // Set cursor to first line
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0);
+    udelay(100);
     
-    // Move cursor to end of first line and enable blinking
-    pr_info("LCD Driver: Enabling blinking cursor\n");
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x06, 0); // Move cursor to end of "Driver"
-    msleep(5);
-    lcd_write_byte(client, LCD_DISPLAY_CTRL | LCD_DISPLAY_ON | LCD_CURSOR_ON | LCD_BLINK_ON, 0);
-    msleep(5);
+    // Write first line
+    lcd_write_string(client, "Driver");
+    
+    // Set cursor to second line
+    lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0);
+    udelay(100);
+    
+    // Write second line
+    lcd_write_string(client, "Loaded");
     
     pr_info("LCD Driver: Display update complete\n");
     return 0;
