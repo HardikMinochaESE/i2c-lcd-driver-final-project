@@ -123,7 +123,7 @@ static void lcd_init(struct i2c_client *client)
     lcd_write_byte(client, 0x06, 0);
     msleep(5);
     
-    // Clear Display (0x01)
+    Clear Display (0x01)
     lcd_write_byte(client, 0x01, 0);
     msleep(5);
     
@@ -148,23 +148,23 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     
     lcd_client = client;
     
-    // Initialize LCD
-    lcd_init(client);
-    msleep(10);  // Wait after init
+    // // Initialize LCD
+    // lcd_init(client);
+    // msleep(10);  // Wait after init
     
-    // Set cursor to first line
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0);
-    udelay(100);
+    // // Set cursor to first line
+    // lcd_write_byte(client, LCD_SET_DDRAM | 0x00, 0);
+    // udelay(100);
     
-    // Write first line
-    // lcd_write_string(client, "Driver");
+    // // Write first line
+    // // lcd_write_string(client, "Driver");
     
-    // Set cursor to second line
-    lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0);
-    udelay(100);
+    // // Set cursor to second line
+    // lcd_write_byte(client, LCD_SET_DDRAM | 0x40, 0);
+    // udelay(100);
     
-    // Write second line
-    //lcd_write_string(client, "Loaded");
+    // // Write second line
+    // //lcd_write_string(client, "Loaded");
     
     pr_info("LCD Driver: Display update complete\n");
     return 0;
