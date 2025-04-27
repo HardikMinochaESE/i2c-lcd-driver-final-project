@@ -62,6 +62,29 @@ static struct class *lcd_class;
 static struct device *lcd_device;
 static int current_temp = 0;
 
+// Function to update LCD display
+static void update_lcd_display(void)
+{
+    int whole, decimal;
+    
+    // Split into whole and decimal parts
+    whole = current_temp / 1000;
+    decimal = current_temp % 1000;
+
+    // Set cursor to second line
+    lcd_command(lcd_client, LCD_SET_DDRAM | 0x40);
+    msleep(1);
+
+    // Write temperature with format XX.XXX Deg C
+    lcd_data(lcd_client, (whole / 10) + '0');
+    lcd_data(lcd_client, (whole % 10) + '0');
+    lcd_data(lcd_client, '.');
+    lcd_data(lcd_client, ((decimal / 100) % 10) + '0');
+    lcd_data(lcd_client, ((decimal / 10) % 10) + '0');
+    lcd_data(lcd_client, (decimal % 10) + '0');
+    lcd_write_string(lcd_client, " Deg C");
+}
+
 // Sysfs attribute show/store functions
 static ssize_t temp_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -78,6 +101,12 @@ static ssize_t temp_store(struct device *dev, struct device_attribute *attr, con
         return ret;
 
     current_temp = temp;
+    
+    // Update LCD display immediately when new value is written
+    if (lcd_client) {
+        update_lcd_display();
+    }
+    
     return count;
 }
 
@@ -183,40 +212,6 @@ static void lcd_init(struct i2c_client *client)
     pr_info("LCD Driver: Initialization complete\n");
 }
 
-// Function to update LCD display
-static void update_lcd_display(void)
-{
-    int whole, decimal;
-    
-    // Split into whole and decimal parts
-    whole = current_temp / 1000;
-    decimal = current_temp % 1000;
-
-    // Set cursor to second line
-    lcd_command(lcd_client, LCD_SET_DDRAM | 0x40);
-    msleep(1);
-
-    // Write temperature with format XX.XXX Deg C
-    lcd_data(lcd_client, (whole / 10) + '0');
-    lcd_data(lcd_client, (whole % 10) + '0');
-    lcd_data(lcd_client, '.');
-    lcd_data(lcd_client, ((decimal / 100) % 10) + '0');
-    lcd_data(lcd_client, ((decimal / 10) % 10) + '0');
-    lcd_data(lcd_client, (decimal % 10) + '0');
-    lcd_write_string(lcd_client, " Deg C");
-}
-
-// Timer callback function
-static void update_timer_callback(struct timer_list *t)
-{
-    if (lcd_client) {
-        update_lcd_display();
-    }
-    
-    // Reschedule timer for next update
-    mod_timer(&update_timer, jiffies + msecs_to_jiffies(5000));
-}
-
 static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     int ret;
@@ -233,6 +228,11 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     lcd_command(client, LCD_SET_DDRAM | 0x00);
     msleep(1);
     lcd_write_string(client, "CPU Temp Monitor");
+    
+    // Initialize second line
+    lcd_command(client, LCD_SET_DDRAM | 0x40);
+    msleep(1);
+    lcd_write_string(client, "00.000 Deg C");
     
     // Create class
     lcd_class = class_create(THIS_MODULE, "lcd_class");
@@ -258,10 +258,6 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
         return ret;
     }
 
-    // Initialize and start timer
-    timer_setup(&update_timer, update_timer_callback, 0);
-    mod_timer(&update_timer, jiffies + msecs_to_jiffies(1000));
-
     pr_info("LCD Driver: Initialization complete\n");
     return 0;
 }
@@ -269,9 +265,6 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 static int lcd_remove(struct i2c_client *client)
 {
     pr_info("LCD Driver: Removing device\n");
-    
-    // Clean up timer
-    del_timer_sync(&update_timer);
     
     // Clean up sysfs and class
     if (lcd_device) {
