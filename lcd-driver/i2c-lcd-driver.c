@@ -2,6 +2,7 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <linux/i2c-dev.h>
+#include <linux/device.h>
 
 #define LCD_ADDR 0x27
 
@@ -51,6 +52,11 @@ static struct i2c_client *lcd_client;
 static struct i2c_board_info lcd_board_info = {
     I2C_BOARD_INFO("i2c-lcd", LCD_ADDR),
 };
+
+// Sysfs related declarations
+static struct class *lcd_class;
+static struct device *lcd_device;
+static char lcd_data_buffer[8];  // Buffer to store temperature string
 
 // Write a nibble to the LCD through PCF8574
 static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 rs) 
@@ -152,8 +158,53 @@ static void lcd_init(struct i2c_client *client)
     pr_info("LCD Driver: Initialization complete\n");
 }
 
+// Sysfs store function - called when userspace writes to the sysfs file
+static ssize_t lcd_data_update(struct device *dev, struct device_attribute *attr,
+                             const char *buf, size_t count)
+{
+    int temp;
+    int whole, decimal;
+
+    // Copy data to our buffer, ensure it's null-terminated
+    if (count > sizeof(lcd_data_buffer) - 1)
+        count = sizeof(lcd_data_buffer) - 1;
+    
+    memcpy(lcd_data_buffer, buf, count);
+    lcd_data_buffer[count] = '\0';
+
+    // Convert string to integer
+    if (kstrtoint(lcd_data_buffer, 10, &temp) < 0) {
+        pr_err("LCD Driver: Invalid temperature format\n");
+        return -EINVAL;
+    }
+
+    // Split into whole and decimal parts
+    whole = temp / 1000;
+    decimal = temp % 1000;
+
+    // Set cursor to second line
+    lcd_command(lcd_client, LCD_SET_DDRAM | 0x40);
+    msleep(1);
+
+    // Write temperature in XX.XXX format
+    lcd_data(lcd_client, (whole / 10) + '0');
+    lcd_data(lcd_client, (whole % 10) + '0');
+    lcd_data(lcd_client, '.');
+    lcd_data(lcd_client, ((decimal / 100) % 10) + '0');
+    lcd_data(lcd_client, ((decimal / 10) % 10) + '0');
+    lcd_data(lcd_client, (decimal % 10) + '0');
+    lcd_write_string(lcd_client, " Deg C");
+
+    return count;
+}
+
+// Define sysfs attribute
+static DEVICE_ATTR_WO(lcd_data);  // Write-only attribute
+
 static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
+    int ret;
+
     pr_info("LCD Driver: Probing device\n");
     
     lcd_client = client;
@@ -162,24 +213,57 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
     lcd_init(client);
     msleep(10);
     
-    // Write a test message
-    lcd_command(client, LCD_SET_DDRAM | 0x00);  // First line
+    // Write header message
+    lcd_command(client, LCD_SET_DDRAM | 0x00);
     msleep(1);
-    
-    // Write first line
     lcd_write_string(client, "CPU Temp Monitor");
-    
-    lcd_command(client, LCD_SET_DDRAM | 0x40);  // Second line
+
+        lcd_command(client, LCD_SET_DDRAM | 0x40);  // Second line
     msleep(1);
     lcd_write_string(client, "Initialized!");
     
     pr_info("LCD Driver: Display update complete\n");
+    
+    // Create sysfs class
+    lcd_class = class_create(THIS_MODULE, "LCD162");
+    if (IS_ERR(lcd_class)) {
+        pr_err("LCD Driver: Failed to create sysfs class\n");
+        return PTR_ERR(lcd_class);
+    }
+
+    // Create sysfs device
+    lcd_device = device_create(lcd_class, NULL, 0, NULL, "lcd_device");
+    if (IS_ERR(lcd_device)) {
+        pr_err("LCD Driver: Failed to create sysfs device\n");
+        class_destroy(lcd_class);
+        return PTR_ERR(lcd_device);
+    }
+
+    // Create sysfs file attribute
+    ret = device_create_file(lcd_device, &dev_attr_lcd_data);
+    if (ret < 0) {
+        pr_err("LCD Driver: Failed to create sysfs file\n");
+        device_destroy(lcd_class, 0);
+        class_destroy(lcd_class);
+        return ret;
+    }
+
+    pr_info("LCD Driver: Sysfs interface created at /sys/class/LCD162/lcd_device/lcd_data\n");
     return 0;
 }
 
 static int lcd_remove(struct i2c_client *client)
 {
     pr_info("LCD Driver: Removing device\n");
+    
+    // Clean up sysfs
+    if (lcd_device) {
+        device_remove_file(lcd_device, &dev_attr_lcd_data);
+        device_destroy(lcd_class, 0);
+    }
+    if (lcd_class)
+        class_destroy(lcd_class);
+
     return 0;
 }
 
