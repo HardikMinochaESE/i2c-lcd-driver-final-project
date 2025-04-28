@@ -19,7 +19,6 @@ case "$1" in
         /sbin/modprobe pwm_fan_driver
         if [ $? -ne 0 ]; then
             echo "Error: Failed to load pwm-fan-driver module"
-            /sbin/rmmod i2c-lcd-driver
             exit 1
         fi
 

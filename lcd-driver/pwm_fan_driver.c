@@ -42,7 +42,7 @@ static ssize_t pwm_duty_cycle_store(struct device *dev, struct device_attribute 
     u32 duty_cycle;
     
     if (count != 1) {
-        printk("Invalid input length\n");
+        pr_err("PWM Driver: Invalid input length\n");
         return -EINVAL;
     }
 
@@ -53,7 +53,7 @@ static ssize_t pwm_duty_cycle_store(struct device *dev, struct device_attribute 
         return count;
     }
 
-    printk("Invalid value - Use 0-9 for fan speed control\n");
+    pr_err("PWM Driver: Invalid value - Use 0-9 for fan speed control\n");
     return -EINVAL;
 }
 
@@ -71,14 +71,14 @@ static int __init ModuleInit(void)
     /* Create PWM class */
     pwm_class = class_create(THIS_MODULE, "pwm");
     if (IS_ERR(pwm_class)) {
-        printk("Failed to create PWM class\n");
+        pr_err("PWM Driver: Failed to create sysfs class\n");
         return PTR_ERR(pwm_class);
     }
 
     /* Create PWM device */
     pwm_device = device_create(pwm_class, NULL, MKDEV(0, 0), NULL, "pwm_fan");
     if (IS_ERR(pwm_device)) {
-        printk("Failed to create PWM device\n");
+        pr_err("PWM Driver: Failed to create sysfs device\n");
         class_destroy(pwm_class);
         return PTR_ERR(pwm_device);
     }
@@ -86,7 +86,7 @@ static int __init ModuleInit(void)
     /* Create sysfs attribute */
     ret = device_create_file(pwm_device, &dev_attr_pwm_duty_cycle);
     if (ret) {
-        printk("Failed to create sysfs attribute\n");
+        pr_err("PWM Driver: Failed to create sysfs file\n");
         device_destroy(pwm_class, MKDEV(0, 0));
         class_destroy(pwm_class);
         return ret;
@@ -95,7 +95,7 @@ static int __init ModuleInit(void)
     /* Request PWM0 */
     pwm0 = pwm_request(0, "pwm-fan");
     if (pwm0 == NULL) {
-        printk("Could not get PWM0!\n");
+        pr_err("PWM Driver: Failed to get PWM0\n");
         device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
         device_destroy(pwm_class, MKDEV(0, 0));
         class_destroy(pwm_class);
