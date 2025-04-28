@@ -39,6 +39,8 @@ static ssize_t pwm_duty_cycle_show(struct device *dev, struct device_attribute *
 /* Sysfs store function */
 static ssize_t pwm_duty_cycle_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
+    u32 duty_cycle;
+    
     if (count != 1) {
         printk("Invalid input length\n");
         return -EINVAL;
@@ -46,7 +48,7 @@ static ssize_t pwm_duty_cycle_store(struct device *dev, struct device_attribute 
 
     if (buf[0] >= '0' && buf[0] <= '9') {
         fan_speed = buf[0];
-        u32 duty_cycle = (fan_speed - '0') * (pwm_period / 10);
+        duty_cycle = (fan_speed - '0') * (pwm_period / 10);
         pwm_config(pwm0, duty_cycle, pwm_period);
         return count;
     }
@@ -66,14 +68,15 @@ static int __init ModuleInit(void)
     int ret;
     printk("PWM Fan Driver - Module Init\n");
 
-    /* Get the existing LCD class and device */
-    lcd_class = class_find("LCD162");
+    /* Get the existing LCD class */
+    lcd_class = class_find_by_name(NULL, "LCD162");
     if (!lcd_class) {
         printk("LCD class not found\n");
         return -ENODEV;
     }
 
-    lcd_device = device_find_child(lcd_class, "lcd_device", NULL);
+    /* Find the LCD device */
+    lcd_device = class_find_device_by_name(lcd_class, "lcd_device");
     if (!lcd_device) {
         printk("LCD device not found\n");
         return -ENODEV;
@@ -113,7 +116,7 @@ static void __exit ModuleExit(void)
 }
 
 module_init(ModuleInit);
-module_exit(ModuleExit); 
+module_exit(ModuleExit);
 
 /* Meta Information */
 MODULE_LICENSE("GPL");
