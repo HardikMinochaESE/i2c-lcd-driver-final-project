@@ -11,12 +11,12 @@ case "$1" in
             echo "Error: Failed to load i2c-lcd-driver module"
             exit 1
         fi
-        start-stop-daemon -S -n thermal_lcd_bridge -a /etc/init.d/thermal_lcd_bridge.sh 
+        start-stop-daemon -S -n thermal_lcd_bridge -a /etc/init.d/thermal_lcd_bridge.sh --start
         ;;
     stop)
         echo "Unloading i2c-lcd-driver module"
+        start-stop-daemon -K -n thermal_lcd_bridge --stop
         /sbin/rmmod i2c-lcd-driver
-        start-stop-daemon -K -n thermal_lcd_bridge
         ;;
     restart)
         $0 stop
