@@ -5,6 +5,7 @@
 #include <linux/sysfs.h>
 #include <linux/device.h>
 #include <linux/kobject.h>
+#include <linux/of.h>
 
 /*
 
@@ -49,7 +50,9 @@ static ssize_t pwm_duty_cycle_store(struct device *dev, struct device_attribute 
     if (buf[0] >= '0' && buf[0] <= '9') {
         fan_speed = buf[0];
         duty_cycle = (fan_speed - '0') * (pwm_period / 10);
-        pwm_config(pwm0, duty_cycle, pwm_period);
+        if (pwm0) {
+            pwm_config(pwm0, duty_cycle, pwm_period);
+        }
         return count;
     }
 
@@ -92,19 +95,36 @@ static int __init ModuleInit(void)
         return ret;
     }
 
-    /* Request PWM0 */
+    /* Request PWM device */
     pwm0 = pwm_request(0, "pwm-fan");
-    if (pwm0 == NULL) {
-        pr_err("PWM Driver: Failed to get PWM0\n");
+    if (IS_ERR(pwm0)) {
+        pr_err("PWM Driver: Failed to get PWM device\n");
         device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
         device_destroy(custom_pwm_class, MKDEV(0, 0));
         class_destroy(custom_pwm_class);
-        return -ENODEV;
+        return PTR_ERR(pwm0);
     }
 
     /* Configure and enable PWM with default speed */
-    pwm_config(pwm0, pwm_duty_cycle, pwm_period);
-    pwm_enable(pwm0);
+    ret = pwm_config(pwm0, pwm_duty_cycle, pwm_period);
+    if (ret) {
+        pr_err("PWM Driver: Failed to configure PWM\n");
+        pwm_free(pwm0);
+        device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
+        device_destroy(custom_pwm_class, MKDEV(0, 0));
+        class_destroy(custom_pwm_class);
+        return ret;
+    }
+
+    ret = pwm_enable(pwm0);
+    if (ret) {
+        pr_err("PWM Driver: Failed to enable PWM\n");
+        pwm_free(pwm0);
+        device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
+        device_destroy(custom_pwm_class, MKDEV(0, 0));
+        class_destroy(custom_pwm_class);
+        return ret;
+    }
 
     return 0;
 }
@@ -114,8 +134,10 @@ static int __init ModuleInit(void)
  */
 static void __exit ModuleExit(void)
 {
-    pwm_disable(pwm0);
-    pwm_free(pwm0);
+    if (pwm0) {
+        pwm_disable(pwm0);
+        pwm_free(pwm0);
+    }
     device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
     device_destroy(custom_pwm_class, MKDEV(0, 0));
     class_destroy(custom_pwm_class);
