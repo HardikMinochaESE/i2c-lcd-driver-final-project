@@ -26,7 +26,7 @@ u32 pwm_period = 40000; // 25 kHz frequency (1/25000 = 0.00004 seconds = 40000 n
 u32 pwm_duty_cycle = 20000; // 50% duty cycle
 
 /* Sysfs attributes */
-static struct class *pwm_class;
+static struct class *custom_pwm_class;
 static struct device *pwm_device;
 static char fan_speed = '5'; // Default to 50% speed
 
@@ -69,17 +69,17 @@ static int __init ModuleInit(void)
     printk("PWM Fan Driver - Module Init\n");
 
     /* Create PWM class */
-    pwm_class = class_create(THIS_MODULE, "pwm");
-    if (IS_ERR(pwm_class)) {
+    custom_pwm_class = class_create(THIS_MODULE, "custom_pwm");
+    if (IS_ERR(custom_pwm_class)) {
         pr_err("PWM Driver: Failed to create sysfs class\n");
-        return PTR_ERR(pwm_class);
+        return PTR_ERR(custom_pwm_class);
     }
 
     /* Create PWM device */
-    pwm_device = device_create(pwm_class, NULL, MKDEV(0, 0), NULL, "pwm_fan");
+    pwm_device = device_create(custom_pwm_class, NULL, MKDEV(0, 0), NULL, "pwm_fan");
     if (IS_ERR(pwm_device)) {
         pr_err("PWM Driver: Failed to create sysfs device\n");
-        class_destroy(pwm_class);
+        class_destroy(custom_pwm_class);
         return PTR_ERR(pwm_device);
     }
 
@@ -87,8 +87,8 @@ static int __init ModuleInit(void)
     ret = device_create_file(pwm_device, &dev_attr_pwm_duty_cycle);
     if (ret) {
         pr_err("PWM Driver: Failed to create sysfs file\n");
-        device_destroy(pwm_class, MKDEV(0, 0));
-        class_destroy(pwm_class);
+        device_destroy(custom_pwm_class, MKDEV(0, 0));
+        class_destroy(custom_pwm_class);
         return ret;
     }
 
@@ -97,8 +97,8 @@ static int __init ModuleInit(void)
     if (pwm0 == NULL) {
         pr_err("PWM Driver: Failed to get PWM0\n");
         device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
-        device_destroy(pwm_class, MKDEV(0, 0));
-        class_destroy(pwm_class);
+        device_destroy(custom_pwm_class, MKDEV(0, 0));
+        class_destroy(custom_pwm_class);
         return -ENODEV;
     }
 
@@ -117,8 +117,8 @@ static void __exit ModuleExit(void)
     pwm_disable(pwm0);
     pwm_free(pwm0);
     device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
-    device_destroy(pwm_class, MKDEV(0, 0));
-    class_destroy(pwm_class);
+    device_destroy(custom_pwm_class, MKDEV(0, 0));
+    class_destroy(custom_pwm_class);
     printk("PWM Fan Driver - Module Exit\n");
 }
 

@@ -3,7 +3,7 @@
 # Paths for thermal data and LCD interface
 THERMAL_PATH="/sys/class/thermal/thermal_zone0/temp"
 LCD_PATH="/sys/class/LCD162/lcd_device/lcd_data_feed"
-PWM_PATH="/sys/class/pwm/pwm_fan/pwm_duty_cycle"
+PWM_PATH="/sys/class/custom_pwm/pwm_fan/pwm_duty_cycle"
 PID_FILE="/var/run/thermal_bridge_pid"
 
 # Temperature range for fan control (in millidegrees Celsius)
