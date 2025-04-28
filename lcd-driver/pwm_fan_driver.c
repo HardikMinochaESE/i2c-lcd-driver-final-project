@@ -26,16 +26,8 @@ u32 pwm_period = 40000; // 25 kHz frequency (1/25000 = 0.00004 seconds = 40000 n
 u32 pwm_duty_cycle = 20000; // 50% duty cycle
 
 /* Sysfs attributes */
-static struct class *lcd_class;
 static struct device *lcd_device;
 static char fan_speed = '5'; // Default to 50% speed
-
-/* Match callback function for class_find_device */
-static int device_match_name(struct device *dev, const void *data)
-{
-    const char *name = data;
-    return !strcmp(dev_name(dev), name);
-}
 
 /* Sysfs show function */
 static ssize_t pwm_duty_cycle_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -75,15 +67,8 @@ static int __init ModuleInit(void)
     int ret;
     printk("PWM Fan Driver - Module Init\n");
 
-    /* Get the existing LCD class */
-    lcd_class = class_find_device(NULL, NULL, "LCD162", device_match_name);
-    if (!lcd_class) {
-        printk("LCD class not found\n");
-        return -ENODEV;
-    }
-
     /* Find the LCD device */
-    lcd_device = class_find_device(lcd_class, NULL, "lcd_device", device_match_name);
+    lcd_device = bus_find_device_by_name(NULL, NULL, "lcd_device");
     if (!lcd_device) {
         printk("LCD device not found\n");
         return -ENODEV;
