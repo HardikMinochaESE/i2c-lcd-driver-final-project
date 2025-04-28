@@ -6,7 +6,7 @@
 case "$1" in
     start)
         echo "Starting thermal lcd bridge daemon"
-        start-stop-daemon -S -n thermal_lcd_bridge_daemon -a /usr/bin/thermal_lcd_bridge_daemon.sh
+        start-stop-daemon -S -n thermal_lcd_bridge_daemon -a /etc/init.d/thermal_lcd_bridge_daemon.sh
         ;;
     stop)
         echo "Stopping thermal lcd bridge daemon"
