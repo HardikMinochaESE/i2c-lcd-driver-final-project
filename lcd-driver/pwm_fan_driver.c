@@ -30,6 +30,13 @@ static struct class *lcd_class;
 static struct device *lcd_device;
 static char fan_speed = '5'; // Default to 50% speed
 
+/* Match callback function for class_find_device */
+static int device_match_name(struct device *dev, const void *data)
+{
+    const char *name = data;
+    return !strcmp(dev_name(dev), name);
+}
+
 /* Sysfs show function */
 static ssize_t pwm_duty_cycle_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -69,14 +76,14 @@ static int __init ModuleInit(void)
     printk("PWM Fan Driver - Module Init\n");
 
     /* Get the existing LCD class */
-    lcd_class = class_find_by_name(NULL, "LCD162");
+    lcd_class = class_find_device(NULL, NULL, "LCD162", device_match_name);
     if (!lcd_class) {
         printk("LCD class not found\n");
         return -ENODEV;
     }
 
     /* Find the LCD device */
-    lcd_device = class_find_device_by_name(lcd_class, "lcd_device");
+    lcd_device = class_find_device(lcd_class, NULL, "lcd_device", device_match_name);
     if (!lcd_device) {
         printk("LCD device not found\n");
         return -ENODEV;
