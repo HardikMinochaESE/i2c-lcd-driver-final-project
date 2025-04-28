@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# i2c-lcd-driver start-stop-daemon script
+# i2c-lcd-driver and pwm-fan-driver start-stop-daemon script
 #
 
 PID_FILE="/var/run/thermal_bridge_pid"
@@ -14,6 +14,15 @@ case "$1" in
             echo "Error: Failed to load i2c-lcd-driver module"
             exit 1
         fi
+
+        echo "Loading pwm-fan-driver module"
+        /sbin/modprobe pwm_fan_driver
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to load pwm-fan-driver module"
+            /sbin/rmmod i2c-lcd-driver
+            exit 1
+        fi
+
         echo "Starting thermal lcd bridge daemon"
         start-stop-daemon -S -p "$PID_FILE" -m -x "$DAEMON_PATH"
         ;;
@@ -24,6 +33,10 @@ case "$1" in
             kill "$PID"
             rm "$PID_FILE"
         fi
+
+        echo "Unloading pwm-fan-driver module"
+        /sbin/rmmod pwm_fan_driver
+
         echo "Unloading i2c-lcd-driver module"
         /sbin/rmmod i2c-lcd-driver
         ;;

@@ -1,4 +1,5 @@
 obj-m += i2c-lcd-driver.o
+obj-m += pwm_fan_driver.o
 
 # Use KERNEL_SRC if provided by Yocto, otherwise use the host kernel
 KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
