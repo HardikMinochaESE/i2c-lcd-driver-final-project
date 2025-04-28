@@ -95,14 +95,28 @@ static int __init ModuleInit(void)
         return ret;
     }
 
-    /* Request PWM device */
+    /* Try to get PWM device - try different PWM numbers */
     pwm0 = pwm_request(0, "pwm-fan");
     if (IS_ERR(pwm0)) {
-        pr_err("PWM Driver: Failed to get PWM device\n");
-        device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
-        device_destroy(custom_pwm_class, MKDEV(0, 0));
-        class_destroy(custom_pwm_class);
-        return PTR_ERR(pwm0);
+        pr_err("PWM Driver: Failed to get PWM0, trying PWM1\n");
+        pwm0 = pwm_request(1, "pwm-fan");
+        if (IS_ERR(pwm0)) {
+            pr_err("PWM Driver: Failed to get PWM1, trying PWM2\n");
+            pwm0 = pwm_request(2, "pwm-fan");
+            if (IS_ERR(pwm0)) {
+                pr_err("PWM Driver: Failed to get any PWM device. Make sure PWM is enabled in device tree\n");
+                device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
+                device_destroy(custom_pwm_class, MKDEV(0, 0));
+                class_destroy(custom_pwm_class);
+                return PTR_ERR(pwm0);
+            } else {
+                printk("PWM Driver: Successfully allocated PWM2\n");
+            }
+        } else {
+            printk("PWM Driver: Successfully allocated PWM1\n");
+        }
+    } else {
+        printk("PWM Driver: Successfully allocated PWM0\n");
     }
 
     /* Configure and enable PWM with default speed */
@@ -126,6 +140,7 @@ static int __init ModuleInit(void)
         return ret;
     }
 
+    printk("PWM Driver: Successfully initialized PWM device\n");
     return 0;
 }
 
