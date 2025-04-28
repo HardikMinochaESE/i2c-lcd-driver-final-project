@@ -14,7 +14,7 @@
     https://www.youtube.com/watch?v=Zy_z_9-7734
 
     The tutorial was helpful in understanding how to create a character device driver
-    and how to use sysfs to control the fan speed.
+    and how to initialize the PWM driver.
 
     https://github.com/Johannes4Linux/Linux_Driver_Tutorial_legacy/blob/main/06_pwm_driver/pwm_driver.c
 * 
@@ -26,7 +26,8 @@ u32 pwm_period = 40000; // 25 kHz frequency (1/25000 = 0.00004 seconds = 40000 n
 u32 pwm_duty_cycle = 20000; // 50% duty cycle
 
 /* Sysfs attributes */
-static struct device *lcd_device;
+static struct class *pwm_class;
+static struct device *pwm_device;
 static char fan_speed = '5'; // Default to 50% speed
 
 /* Sysfs show function */
@@ -67,17 +68,27 @@ static int __init ModuleInit(void)
     int ret;
     printk("PWM Fan Driver - Module Init\n");
 
-    /* Find the LCD device */
-    lcd_device = bus_find_device_by_name(NULL, NULL, "lcd_device");
-    if (!lcd_device) {
-        printk("LCD device not found\n");
-        return -ENODEV;
+    /* Create PWM class */
+    pwm_class = class_create(THIS_MODULE, "pwm");
+    if (IS_ERR(pwm_class)) {
+        printk("Failed to create PWM class\n");
+        return PTR_ERR(pwm_class);
+    }
+
+    /* Create PWM device */
+    pwm_device = device_create(pwm_class, NULL, MKDEV(0, 0), NULL, "pwm_fan");
+    if (IS_ERR(pwm_device)) {
+        printk("Failed to create PWM device\n");
+        class_destroy(pwm_class);
+        return PTR_ERR(pwm_device);
     }
 
     /* Create sysfs attribute */
-    ret = device_create_file(lcd_device, &dev_attr_pwm_duty_cycle);
+    ret = device_create_file(pwm_device, &dev_attr_pwm_duty_cycle);
     if (ret) {
         printk("Failed to create sysfs attribute\n");
+        device_destroy(pwm_class, MKDEV(0, 0));
+        class_destroy(pwm_class);
         return ret;
     }
 
@@ -85,7 +96,9 @@ static int __init ModuleInit(void)
     pwm0 = pwm_request(0, "pwm-fan");
     if (pwm0 == NULL) {
         printk("Could not get PWM0!\n");
-        device_remove_file(lcd_device, &dev_attr_pwm_duty_cycle);
+        device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
+        device_destroy(pwm_class, MKDEV(0, 0));
+        class_destroy(pwm_class);
         return -ENODEV;
     }
 
@@ -103,7 +116,9 @@ static void __exit ModuleExit(void)
 {
     pwm_disable(pwm0);
     pwm_free(pwm0);
-    device_remove_file(lcd_device, &dev_attr_pwm_duty_cycle);
+    device_remove_file(pwm_device, &dev_attr_pwm_duty_cycle);
+    device_destroy(pwm_class, MKDEV(0, 0));
+    class_destroy(pwm_class);
     printk("PWM Fan Driver - Module Exit\n");
 }
 
