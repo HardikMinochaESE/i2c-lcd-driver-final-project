@@ -35,15 +35,13 @@ main() {
     # Check if paths exist
     check_paths
     
-    # Write PID to file
-    echo $$ > "$PID_FILE"
-    
     # Infinite loop
     while true; do
         update_lcd
-        sleep 5  # Update every 5 seconds
+        sleep 1  # Update every 1 second
     done
 }
 
-# Start the main loop in background
-main & 
+# Start the main loop in background and capture its PID
+main &
+echo $! > "$PID_FILE" 

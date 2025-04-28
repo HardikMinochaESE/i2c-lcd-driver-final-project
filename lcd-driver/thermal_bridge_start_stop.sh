@@ -4,7 +4,7 @@
 #
 
 PID_FILE="/var/run/thermal_bridge_pid"
-DAEMON_PATH="./thermal_lcd_bridge.sh"
+DAEMON_PATH="/etc/init.d/thermal_lcd_bridge_daemon.sh"
 
 case "$1" in
     start)
