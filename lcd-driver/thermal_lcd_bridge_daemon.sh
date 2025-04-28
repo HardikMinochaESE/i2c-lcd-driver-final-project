@@ -46,5 +46,4 @@ main() {
 }
 
 # Start the main loop in background
-main &
-
+main & 
