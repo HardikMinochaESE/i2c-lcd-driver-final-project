@@ -8,7 +8,6 @@
 #include <linux/of.h>
 
 /*
-
     REFERENCES AND ACKNOWLEDGEMENTS:
 
     This driver was created by following the tutorial at:
@@ -18,13 +17,12 @@
     and how to initialize the PWM driver.
 
     https://github.com/Johannes4Linux/Linux_Driver_Tutorial_legacy/blob/main/06_pwm_driver/pwm_driver.c
-* 
 */
 
 /* Variables for pwm */
 struct pwm_device *pwm0 = NULL;
-u32 pwm_period = 40000; // 25 kHz frequency (1/25000 = 0.00004 seconds = 40000 nanoseconds)
-u32 pwm_duty_cycle = 20000; // 50% duty cycle
+u32 pwm_period = 1000000; // 1kHz frequency (1ms period)
+u32 pwm_duty_cycle = 500000; // 50% duty cycle
 
 /* Sysfs attributes */
 static struct class *custom_pwm_class;
@@ -41,15 +39,29 @@ static ssize_t pwm_duty_cycle_show(struct device *dev, struct device_attribute *
 static ssize_t pwm_duty_cycle_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     u32 duty_cycle;
+    int speed;
     
-    if (count != 1) {
-        pr_err("PWM Driver: Invalid input length\n");
+    if (count == 0) {
+        pr_err("PWM Driver: Empty input\n");
         return -EINVAL;
     }
 
-    if (buf[0] >= '0' && buf[0] <= '9') {
+    // Try to convert input to integer first
+    if (kstrtoint(buf, 10, &speed) == 0) {
+        // Valid integer input
+        if (speed >= 0 && speed <= 9) {
+            fan_speed = speed + '0';
+            duty_cycle = (speed * pwm_period) / 10; // Convert 0-9 to 0-90% duty cycle
+            if (pwm0) {
+                pwm_config(pwm0, duty_cycle, pwm_period);
+            }
+            return count;
+        }
+    }
+    // If not a valid integer, try single character
+    else if (count == 1 && buf[0] >= '0' && buf[0] <= '9') {
         fan_speed = buf[0];
-        duty_cycle = (fan_speed - '0') * (pwm_period / 10);
+        duty_cycle = ((fan_speed - '0') * pwm_period) / 10;
         if (pwm0) {
             pwm_config(pwm0, duty_cycle, pwm_period);
         }

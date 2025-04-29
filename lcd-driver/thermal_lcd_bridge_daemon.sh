@@ -8,7 +8,7 @@ PID_FILE="/var/run/thermal_bridge_pid"
 
 # Temperature range for fan control (in millidegrees Celsius)
 MIN_TEMP=35000
-MAX_TEMP=60000
+MAX_TEMP=45000
 
 # Function to check if files exist
 check_paths() {
