@@ -58,6 +58,9 @@ static struct class *lcd_class;
 static struct device *lcd_device;
 static char lcd_data_buffer[8];  // Buffer to store temperature string
 
+// Add adapter as a global variable
+static struct i2c_adapter *lcd_adapter;
+
 // Write a nibble to the LCD through PCF8574
 static void lcd_write_nibble(struct i2c_client *client, u8 nibble, u8 rs) 
 {
@@ -299,22 +302,21 @@ static struct i2c_driver lcd_driver = {
 static int __init lcd_driver_init(void)
 {
     int ret;
-    struct i2c_adapter *adapter;
     
     pr_info("LCD Driver: Starting module initialization\n");
     
     // Get the I2C adapter for bus 1
-    adapter = i2c_get_adapter(1);
-    if (!adapter) {
+    lcd_adapter = i2c_get_adapter(1);
+    if (!lcd_adapter) {
         pr_err("LCD Driver: Failed to get I2C adapter\n");
         return -ENODEV;
     }
     
     // Register the board info
-    lcd_client = i2c_new_client_device(adapter, &lcd_board_info);
+    lcd_client = i2c_new_client_device(lcd_adapter, &lcd_board_info);
     if (!lcd_client) {
         pr_err("LCD Driver: Failed to create I2C client\n");
-        i2c_put_adapter(adapter);
+        i2c_put_adapter(lcd_adapter);
         return -ENODEV;
     }
     
@@ -327,7 +329,6 @@ static int __init lcd_driver_init(void)
         pr_info("LCD Driver: Successfully loaded\n");
     }
     
-    i2c_put_adapter(adapter);
     return ret;
 }
 
@@ -337,6 +338,12 @@ static void __exit lcd_driver_exit(void)
         i2c_unregister_device(lcd_client);
     }
     i2c_del_driver(&lcd_driver);
+    
+    // Put the adapter here, when we're sure we're done with it
+    if (lcd_adapter) {
+        i2c_put_adapter(lcd_adapter);
+    }
+    
     pr_info("LCD Driver: Module unloaded\n");
 }
 
